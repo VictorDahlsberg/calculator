@@ -1,0 +1,4 @@
+a add b
+b add c
+c add a
+print a
