@@ -1,8 +1,0 @@
-a add 1
-a add b
-b add c
-c add 10
-c subtract 1
-a multiply d
-d add 10
-print a
