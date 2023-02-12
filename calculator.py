@@ -1,81 +1,86 @@
+import sys
+import io
+
+
+def is_float(value: any) -> bool:
+    try:
+        float(value)
+        return True
+
+    except ValueError:
+        return False
+
+
 class Register:
-    def __init__(self, operation, operand):
+    def __init__(self, operation: str, operand: str) -> None:
         self.value: int = 0
         self.expression: list[list[str, str]] = [[operation, operand]]
-        self.is_evaluated = False
+        self.is_evaluated: bool = False
 
-    def reset_register(self):
-        self.value = 0
-        self.is_evaluated = False
+    def reset_register(self) -> None:
+        self.value: float = 0
+        self.is_evaluated: bool = False
 
 
 class Calculator:
-    def __init__(self):
-        self.registers: dict[str, Register] = {}
 
-    def add(self, register, operand):
-        if register in self.registers:
-            self.registers[register].expression.append(["add", operand])
-            self.registers[register].reset_register()
-        else:
-            self.registers[register] = Register("add", operand)
-
-    def subtract(self, register: str, operand):
-        if register in self.registers:
-            self.registers[register].expression.append(["subtract", operand])
-            self.registers[register].reset_register()
-        else:
-            self.registers[register] = Register("subtract", operand)
-
-    def multiply(self, register: str, operand):
-        if register in self.registers:
-            self.registers[register].expression.append(["multiply", operand])
-            self.registers[register].reset_register()
-        else:
-            self.registers[register] = Register("multiply", operand)
-
-    # TODO: Argumetn should be string
-    def evaluate_register(self, register: Register):
-        if register.is_evaluated:
-            return register.value
-
-        for operation, operand in register.expression:
-            if operation == "add":
-                if operand.isnumeric():
-                    register.value += int(operand)
-
-                else:
-                    register.value += self.evaluate_register(
-                        self.registers[operand])
-
-            elif operation == "subtract":
-                if operand.isnumeric():
-                    register.value -= int(operand)
-
-                else:
-                    register.value -= self.evaluate_register(
-                        self.registers[operand])
-
-            elif operation == "multiply":
-                if operand.isnumeric():
-                    register.value *= int(operand)
-
-                else:
-                    register.value *= self.evaluate_register(
-                        self.registers[operand])
-
-        register.is_evaluated = True
-        return register.value
-
-
-class CalculatorInterface:
     VALID_OPERATIONS = ["add", "subtract", "multiply"]
 
     def __init__(self) -> None:
-        self.calculator: Calculator = Calculator()
+        self.registers: dict[str, Register] = {}
 
-    def parse_input(self) -> None:
-        command: str = input("Please enter command:\n")
+    def new_operation(self, register: str, operation: str, operand: str) -> None:
+        if register in self.registers:
+            self.registers[register].expression.append([operation, operand])
+            self.registers[register].reset_register()
+        else:
+            self.registers[register] = Register(operation, operand)
+
+    def evaluate_register(self, register: str) -> None:
+        reg: Register = self.registers[register]
+
+        if reg.is_evaluated:
+            return reg.value
+
+        for operation, operand in reg.expression:
+            if operation == "add":
+                if is_float(operand):
+                    reg.value += float(operand)
+
+                else:
+                    reg.value += self.evaluate_register(operand)
+
+            elif operation == "subtract":
+                if is_float(operand):
+                    reg.value -= float(operand)
+
+                else:
+                    reg.value -= float.evaluate_register(operand)
+
+            elif operation == "multiply":
+                if is_float(operand):
+                    reg.value *= float(operand)
+
+                else:
+                    reg.value *= self.evaluate_register(operand)
+
+        reg.is_evaluated = True
+        return reg.value
+
+
+class CalculatorInterface:
+    """
+    A termminal user interface for Calculator used for reading commands from
+    standard input or from file. Also notifies user of potential invalid inputs
+    """
+
+    def __init__(self) -> None:
+        self.calculator: Calculator = Calculator()
+        self.file_line_number: int = None
+
+    def parse_input(self, command: str, line_number: int = None) -> None:
+        """Interprets command and notifies user of potential invalid input"""
+
         words: list[str] = command.lower().split()
 
         match words:
@@ -83,57 +88,110 @@ class CalculatorInterface:
                 quit()
 
             case["print", register]:
-                # TODO: check if register exists
-                if self.is_valid_register(register):
-                    self.calculator.registers[register].reset_register()
-                    print(self.calculator.evaluate_register(
-                        self.calculator.registers[register]))
+                self.print_register(register)
 
-            case[register, operation, value]:
-                if not self.is_valid_register(register) or not self.is_valid_value(value):
+            case[register, operation, operand]:
+                if (not self.is_valid_register(register, line_number) or
+                        not self.is_valid_operand(operand, line_number)):
                     return
 
-                if operation not in self.VALID_OPERATIONS:
-                    print("Invalid operation")
+                if operation not in self.calculator.VALID_OPERATIONS:
+                    self.notify_input_error("Invalid operation")
                     return
 
-                elif operation == "add":
-                    self.calculator.add(register, value)
-
-                elif operation == "subtract":
-                    self.calculator.subtract(register, value)
-
-                elif operation == "multiply":
-                    self.calculator.multiply(register, value)
+                else:
+                    self.calculator.new_operation(register, operation, operand)
 
             case _:
-                print("Invalid command")
+                self.notify_input_error("Invalid command structure")
 
-    def is_valid_register(self, register: str) -> bool:
+    def parse_file(self, file_path: str):
+        """Reads lines from file and interprets each line as a command"""
+
+        try:
+            file_object: io.TextIOWrapper = open(file_path, "r")
+
+        except FileNotFoundError:
+            print("File \"{}\" could not found".format(file_path))
+            return
+
+        self.is_file_mode = True
+        lines: list[str] = file_object.readlines()
+        for line_number, line in enumerate(lines):
+            self.file_line_number = line_number
+            self.parse_input(line)
+        quit()
+
+    def print_register(self, register: str) -> None:
+        """Prints register value to standard output with 1 decimal place"""
+
+        if not self.is_valid_register(register):
+            return
+
+        elif register not in self.calculator.registers:
+            self.notify_input_error(
+                "Register \"{}\" does not exist".format(register))
+            return
+
+        print(round(self.calculator.evaluate_register(register), 1))
+
+    def is_valid_register(self, register: str,
+                          line_number: int = None) -> bool:
+        """Checks if the specified register has a valid name"""
+
         if not register:
-            print("Register can't be empty")
+            self.notify_input_error("Register name cannot be empty")
             return False
 
         elif register.isnumeric():
-            print("Registers must contain atleast one letter")
+            self.notify_input_error(
+                "Register name must contain atleast one letter")
             return False
 
         elif not register.isalnum():
-            print("Registers can only contaion alphanumerical characters")
-            return False
-        return True
-
-    def is_valid_value(self, value: str) -> bool:
-        if not value:
-            print("Value can't be empty")
+            self.notify_input_error(
+                "Register name can only contain alphanumerical characters")
             return False
 
-        elif not value.isnumeric():
-            return self.is_valid_register(value)
         return True
+
+    def is_valid_operand(self, operand: str, line_number: int = None) -> bool:
+        """Checks if the specified operand is valid"""
+
+        if not operand:
+            self.notify_input_error("Value can't be empty")
+            return False
+
+        elif not is_float(operand):
+            return self.is_valid_register(operand, line_number)
+
+        return True
+
+    def notify_input_error(self, error_message: str) -> None:
+        """
+        Notifies user of potential invalid inputs by
+        printing error_message to standard output
+        """
+        message: str = ""
+        if self.file_line_number is not None:
+            message += "Error in line {}, ".format(self.file_line_number)
+
+        message += error_message
+        print(message)
 
 
 if __name__ == "__main__":
-    calc_interface = CalculatorInterface()
-    while True:
-        calc_interface.parse_input()
+    calc_interface: CalculatorInterface = CalculatorInterface()
+    num_args: int = len(sys.argv)
+
+    if num_args > 2:
+        print("Expected 0 or 1 argument, but {} were given".format(num_args - 1))
+
+    elif num_args == 2:
+        calc_interface.parse_file(sys.argv[1])
+
+    else:
+        print("Enter commands on the form <register> <operation> <value>")
+        while True:
+            command: str = input("Please enter command:\n")
+            calc_interface.parse_input(command)
