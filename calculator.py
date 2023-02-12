@@ -3,6 +3,7 @@ import io
 
 
 def is_float(value: any) -> bool:
+    """Checks if value is float"""
     try:
         float(value)
         return True
@@ -12,31 +13,65 @@ def is_float(value: any) -> bool:
 
 
 class Register:
+    """
+    A register which has a value and list of operations
+    which are to be executed on the register
+    """
+
     def __init__(self, operation: str, operand: str) -> None:
+        """Inits Register with value 0 and adds
+        operation and operand to expression list"""
         self.value: int = 0
         self.expression: list[list[str, str]] = [[operation, operand]]
         self.is_evaluated: bool = False
 
     def reset_register(self) -> None:
+        """Resets register value and marks it as not evaluated"""
         self.value: float = 0
         self.is_evaluated: bool = False
 
+    def add_operation(self, operation: str, operand: str):
+        """Adds a new operation to the register"""
+        self.expression.append([operation, operand])
+
 
 class Calculator:
+    """
+    A lazily evaluated calculator that can add, subract and multiply
+    values in a set of registers. Registers that don't explicitly get
+    assigned a value will be assumed to have the value 0.
+    """
 
     VALID_OPERATIONS = ["add", "subtract", "multiply"]
 
     def __init__(self) -> None:
+        """Inits Calculator with no registers"""
         self.registers: dict[str, Register] = {}
+        self.register_visitation_map: dict[str, list[str]] = {}
 
-    def new_operation(self, register: str, operation: str, operand: str) -> None:
+    def new_operation(
+            self, register: str, operation: str, operand: str) -> None:
+        """Adds new operation to be evaluated to register"""
         if register in self.registers:
-            self.registers[register].expression.append([operation, operand])
+            self.registers[register].add_operation(operation, operand)
             self.registers[register].reset_register()
         else:
             self.registers[register] = Register(operation, operand)
+            self.register_visitation_map[register] = []
 
-    def evaluate_register(self, register: str) -> None:
+    def evaluate_register(
+            self, register: str, visited_registers: list[str] = []) -> float:
+        """Returns the value of the register if possible"""
+
+        # Avoids RecursionError by checking for loops in visited_registers
+        if register in visited_registers[0:-1]:
+            print("Cirlcular logic detected, aborting...")
+            quit()
+
+        # Register value is assumed to be 0 if not given a value
+        if register not in self.registers:
+            return 0
+
         reg: Register = self.registers[register]
 
         if reg.is_evaluated:
@@ -48,21 +83,24 @@ class Calculator:
                     reg.value += float(operand)
 
                 else:
-                    reg.value += self.evaluate_register(operand)
+                    reg.value += self.evaluate_register(
+                        operand, visited_registers + [operand])
 
             elif operation == "subtract":
                 if is_float(operand):
                     reg.value -= float(operand)
 
                 else:
-                    reg.value -= float.evaluate_register(operand)
+                    reg.value -= float.evaluate_register(
+                        operand, visited_registers + [operand])
 
             elif operation == "multiply":
                 if is_float(operand):
                     reg.value *= float(operand)
 
                 else:
-                    reg.value *= self.evaluate_register(operand)
+                    reg.value *= self.evaluate_register(
+                        operand, visited_registers + [operand])
 
         reg.is_evaluated = True
         return reg.value
@@ -75,14 +113,13 @@ class CalculatorInterface:
     """
 
     def __init__(self) -> None:
+        """Inits CalculatorInterface and creates new Calculator"""
         self.calculator: Calculator = Calculator()
         self.file_line_number: int = None
 
     def parse_input(self, command: str, line_number: int = None) -> None:
         """Interprets command and notifies user of potential invalid input"""
-
         words: list[str] = command.lower().split()
-
         match words:
             case["quit"]:
                 quit()
@@ -105,9 +142,8 @@ class CalculatorInterface:
             case _:
                 self.notify_input_error("Invalid command structure")
 
-    def parse_file(self, file_path: str):
+    def parse_file(self, file_path: str) -> None:
         """Reads lines from file and interprets each line as a command"""
-
         try:
             file_object: io.TextIOWrapper = open(file_path, "r")
 
@@ -128,15 +164,10 @@ class CalculatorInterface:
         if not self.is_valid_register(register):
             return
 
-        elif register not in self.calculator.registers:
-            self.notify_input_error(
-                "Register \"{}\" does not exist".format(register))
-            return
-
         print(round(self.calculator.evaluate_register(register), 1))
 
-    def is_valid_register(self, register: str,
-                          line_number: int = None) -> bool:
+    def is_valid_register(
+            self, register: str, line_number: int = None) -> bool:
         """Checks if the specified register has a valid name"""
 
         if not register:
@@ -185,7 +216,8 @@ if __name__ == "__main__":
     num_args: int = len(sys.argv)
 
     if num_args > 2:
-        print("Expected 0 or 1 argument, but {} were given".format(num_args - 1))
+        print("Expected 0 or 1 argument, but {} were given"
+              .format(num_args - 1))
 
     elif num_args == 2:
         calc_interface.parse_file(sys.argv[1])
