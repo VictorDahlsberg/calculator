@@ -91,7 +91,7 @@ class Calculator:
                     reg.value -= float(operand)
 
                 else:
-                    reg.value -= float.evaluate_register(
+                    reg.value -= self.evaluate_register(
                         operand, visited_registers + [operand])
 
             elif operation == "multiply":
