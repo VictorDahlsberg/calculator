@@ -47,7 +47,6 @@ class Calculator:
     def __init__(self) -> None:
         """Inits Calculator with no registers"""
         self.registers: dict[str, Register] = {}
-        self.register_visitation_map: dict[str, list[str]] = {}
 
     def new_operation(
             self, register: str, operation: str, operand: str) -> None:
@@ -57,7 +56,6 @@ class Calculator:
             self.registers[register].reset_register()
         else:
             self.registers[register] = Register(operation, operand)
-            self.register_visitation_map[register] = []
 
     def evaluate_register(
             self, register: str, visited_registers: list[str] = []) -> float:
